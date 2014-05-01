@@ -1,0 +1,73 @@
+#!/usr/bin/gawk -f
+
+### obsoleto
+
+BEGIN {
+  FS = "=";
+  IGNORECASE = 1;
+  if ( ! ARGV[1] ) {
+    print "usage: abook_query arg1 [arg2] [argn] [--key=[name|email|nick|...]] [--join='char']";
+    exit 1;
+  };
+  args = ARGV[1];
+  ARGV[1] = ENVIRON["HOME"]"/.abook/addressbook";
+  for ( i = 2; i < ARGC; i++ ) {
+    if ( ARGV[i] ~ /--join=/ ) {
+      split(ARGV[i], opt, /=/)
+      ORS = opt[2];
+    }
+    else {
+      if ( ARGV[i] ~ /--key/ ) {
+    split(ARGV[i], key, /=/)
+      }
+      else {
+    args = ( args "|" ARGV[i] );
+      }
+    }
+    ARGV[i] = "";
+  };
+
+  # contadores:
+  i = 0;
+  j = 0;
+  k = 0;
+  l = 0;
+};
+
+/=/ {
+  # gerando o hash chave=valor para comparacao posterior
+  h[$1] = $2;
+};
+/^$/ {
+  if ( ! key[2] ) { key[2] = "." ; }
+
+  # para cada item do hash
+  for ( i in h ) {
+    if ( i ~ key[2] ) {
+      # verificar se existe algum argumento passado na linha de comando
+      if ( h[i] ~ args ) {
+    split(h["email"], mail, /,/);
+    for ( m in mail ) {
+        if (( key[2] == "email" ) && ( mail[m] !~ args )) { continue; }
+      # gerando array de impressao
+      if ( opt[2] ) {
+        out[++k]=mail[m];
+      }
+      else {
+        out[++k]=("\""h["name"]"\" <"mail[m]">");
+      }
+    };
+    continue;
+      };
+      continue;
+    };
+  };
+};
+
+END {
+  for ( l = 1; l < k; l++ ) {
+    print out[l];
+  }
+  ORS = "\n";
+  print out[k];
+}
