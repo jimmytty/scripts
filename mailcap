@@ -1,0 +1,728 @@
+#!/bin/bash
+
+# TODO: REMAKE!
+
+#==============================================================================
+# AUTHOR:       Ronaldo Ferreira de Lima aka jimmy
+# CREATED:      2009-02-11
+# DESCRIPTION:  Simples apoio aos mecanismos do mailcap
+#==============================================================================
+
+#==============================================================================
+# TRATAMENTO DE PARAMETROS
+#==============================================================================
+
+if (( $BASH_ARGC == 1 )); then
+    filename="$1"
+    nterm=1
+else
+    while [ -n "$1" ]; do
+        argv="$1"
+        if [[ $argv =~ = ]]; then
+            argv="$(sed 's/=/=\d39/;s/$/\d39/' <<< ""$argv"" )"
+            eval "$argv"''
+        fi
+        shift
+    done
+
+    filename=$fn
+fi
+
+content_type=$ct
+
+content_type_name="$ctn"
+if [[ ${content_type_name} =~ ^=\?[^?]+\?[Qq]\? ]]; then
+    encoding_mime='mime-q'
+elif [[ ${content_type_name} =~ ^=\?[^?]+\?[Bb]\? ]]; then
+    encoding_mime='mime-b'
+fi
+test ! -z "$encoding_mime" &&
+content_type_name_clean="$(piconv -f $encoding_mime -t latin1 --perlqq <<< ""$ctn" | sed 's/\s\+/_/g'")"
+
+charset=$cs
+[ $charset ] && charset=$(tr A-Z a-z <<< $cs)
+
+copiousoutput=$cout
+needsterminal=$nterm
+test_only=$tt
+
+if [ -z $content_type ] || [ $content_type = 'application/octet-stream' ]; then
+    magic_mime_type="$(file --raw --brief --mime "$filename")"
+    IFS=':;'
+    mime=( $magic_mime_type )
+    IFS=$'\n\t '
+    content_type=$(sed -r 's/^(\s+)$//g;s/\s+/ /g'<<< ${mime[0]})
+fi
+
+if [ ! $charset ] && [ $content_type = 'text/plain' ]; then
+    [[ ${mime[1]} =~ charset=\(.*\) ]] && charset=${BASH_REMATCH[1]}
+fi
+
+
+#==============================================================================
+# VARIVAVEIS GLOBAIS
+#==============================================================================
+
+ELINKS_DUMP_OPTIONS=$(cat <<EOF
+-eval 'set document.browse.margin_width = 0'
+-config-file /etc/elinks.conf
+-dump
+-dump-charset iso-8859-1
+-dump-width 79
+-force-html
+-no-numbering
+EOF
+)
+ELINKS_DUMP_OPTIONS=${ELINKS_DUMP_OPTIONS[@]}
+elinks="$(which elinks 2>&1)"
+
+fmt='fmt --prefix="" --split-only --uniform-spacing --width=80'
+utf8tolatin1="sed -f ${HOME}/bin/sed/utf8tolatin1.sed"
+
+LESS='-cisSW'
+
+EXTCODE='asm aux awk b bc bib bsh c cls cpp csh csv el exp java ksh lof patch pl pm sed sh sql sty tcl tex xml zsh el yml diff t2t conf patch json'
+REGEXCODE=$(sed 's/^/\\.(/;s/ /|/g;s/$/)$/;' <<< "$EXTCODE")
+GLOBEXTCODE=$(sed 's/^/*.{/;s/ /,/g;s/$/}/;' <<< "$EXTCODE")
+CASECODE=$(sed 's/\s\+/|/g;' <<< "$EXTCODE")
+
+#==============================================================================
+# DECLARACAO DE FUNCOES
+#==============================================================================
+
+function DEFINE_MAGICK_FILE {
+    magic_filename="$(file --brief --no-pad --preserve-date --raw "$filename")"
+    if [ ! $TYPE ]; then
+        DEFINE_EXTENSION
+    fi
+}
+
+function DEFINE_EXTENSION {
+    base="$(basename "$filename")"
+    ext=${base#*.}
+    ext="$(expr match "$filename" '^.*\.\([[:alnum:]]\+\)$')"
+    if [ ! -z "$ext" ]; then
+        ext="$(tr A-Z a-z <<< $ext)"
+        case $ext in
+            log) TYPE='TEXT'; SUBTYPE='LOG'; EXTENSION='LOG' ;;
+            xlsx) TYPE='MSEXCEL2007+'; EXTENSION='XLSX' ;;
+            xls) TYPE='MSEXCEL'; EXTENSION='XLS' ;;
+            conf) TYPE='TEXT'; SUBTYPE='CODE';;
+            *) REPORT ;;
+        esac
+    fi
+}
+
+
+function DEFINE_TYPE {
+
+    case $content_type in
+        application/x-empty)               TYPE='APPLICATION'; SUBTYPE='EMPTY'; test=1 ;;
+        application/vnd.oasis.opendocument.text) TYPE='ODT'; SUBTYPE='TEXT';;
+        application/excel)                 TYPE='MSEXCEL' ;;
+        application/gnutar)                TYPE='TARBALL' ;;
+        application/ms-Excel)              TYPE='MSEXCEL' ;;
+        application/ms-tnef)               TYPE='MSTNEF' ;;
+        application/msexcel)               TYPE='MSEXCEL' ;;
+        application/msword)                TYPE='MSWORD' ;;
+        application/octet-stream.cab)      TYPE='CAB' ;;
+        application/ogg)                   TYPE='AUDIO'; SUBTYPE='OGG' ;;
+        application/pdf)                   TYPE='PDF' ;;
+        application/pgp-signature)         TYPE='TEXT'; SUBTYPE='PLAIN' ;;
+        application/postscript)            TYPE='POSTSCRIPT' ;;
+        application/ppt)                   TYPE='MSPOWERPOINT' ;;
+        application/rtf)                   TYPE='RTF' ;;
+        application/sgml)                  TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/vnd.ms-excel)          TYPE='MSEXCEL' ;;
+        application/vnd.ms-powerpoint)     TYPE='MSPOWERPOINT' ;;
+        application/vnd.ms-tnef)           TYPE='MSTNEF' ;;
+        application/vnd.msword)            TYPE='MSWORD' ;;
+        application/x-7z-compressed)       TYPE='7ZIP' ;;
+        application/x-7zip)                TYPE='7ZIP' ;;
+        application/x-xz)                  TYPE='7ZIP' ;;
+        application/x-arj)                 TYPE='ARJ' ;;
+        application/x-awk)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-bzip2)               TYPE='BZIP2' ;;
+        application/x-csh)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-endnote-filter)      TYPE='TEXT'; SUBTYPE='PLAIN' ;;
+        application/x-excel)               TYPE='MSEXCEL' ;;
+        application/x-gawk)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-gzip)                TYPE='GZIP'; SUBTYP='GZIP' ;;
+        application/x-java-class)          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-javascript)          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-ksh)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-latex)               TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-lisp)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-msexcel)             TYPE='MSEXCEL' ;;
+        application/x-mspowerpoint)        TYPE='MSPOWERPOINT' ;;
+        application/x-perl)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-rpm)                 TYPE='RPM' ;;
+        application/x-sh)                  TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-shellscript)         TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-tar)                 TYPE='TAR' ;;
+        application/x-tar-gz)              TYPE='TAR'; SUBTYPE='GZIP' ;;
+        application/x-tcl)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-tex)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-tgz)                 TYPE='TAR'; SUBTYPE='GZIP' ;;
+        application/zip)                   TYPE='ZIP' ;;
+        application/x-zip)                 TYPE='ZIP' ;;
+        application/x-zip-compressed)      TYPE='ZIP' ;;
+        application/xml)                   TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/xml-dtd)               TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/zip)                   DEFINE_EXTENSION ;;
+        audio/mid)                         TYPE='AUDIO'; SUBTYPE='MIDI' ;;
+        audio/midi)                        TYPE='AUDIO'; SUBTYPE='MIDI' ;;
+        audio/mpeg)                        TYPE='AUDIO'; SUBTYPE='MP3' ;;
+        audio/ogg)                         TYPE='AUDIO'; SUBTYPE='OGG' ;;
+        audio/x-wav)                       TYPE='AUDIO'; SUBTYPE='WAV' ;;
+        image/gif)                         TYPE='IMAGE'; SUBTYPE='GIF' ;;
+        image/jpeg)                        TYPE='IMAGE'; SUBTYPE='JPEG' ;;
+        image/png)                         TYPE='IMAGE'; SUBTYPE='PNG' ;;
+        image/x-xcf)                       TYPE='IMAGE'; SUBTYPE='XCF' ;;
+        message/disposition-notification)  TYPE='TEXT'; SUBTTYPE='PLAIN' ;;
+        text/calendar)                     TYPE='TEXT'; SUBTYPE='PLAIN' ;;
+        text/css)                          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/html)                         TYPE='TEXT'; SUBTYPE='HTML' ;;
+        text/pascal)                       TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/plain)                        TYPE='TEXT'; SUBTYPE='PLAIN' ;;
+        text/sgml)                         TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/troff)                        TYPE='TEXT'; SUBTYPE='ROFF' ;;
+        text/x-asm)                        TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-c)                          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/csv)                          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-fortran)                    TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-java-source)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.csh)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.elisp)               TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.guile)               TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.ksh)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.lisp)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.perl)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.perl-module)         TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.phyton)              TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.rexx)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.scheme)              TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.sh)                  TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.tcl)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.tcsh)                TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-script.zsh)                 TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-diff)                       TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-sgml)                       TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-tex)                        TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-patch)                      TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-lisp)                       TYPE='TEXT'; SUBTYPE='CODE' ;;
+        text/x-vcard)                      TYPE='VCARD' ;;
+        text/xml)                          TYPE='TEXT'; SUBTYPE='CODE' ;;
+        video/x-ms-asf)                    TYPE='VIDEO'; SUBTYPE='ASF' ;;
+        video/x-ms-wmv)                    TYPE='VIDEO'; SUBTYPE='WMV' ;;
+        application/octet-stream)          DEFINE_MAGICK_FILE ;;
+        application/vnd.ms-office)         DEFINE_EXTENSION ;;
+        application/x-rar-compressed)      TYPE='RAR' ;;
+        application/json)                  TYPE='TEXT'; SUBTYPE='CODE' ;;
+        application/x-dvi)                 TYPE='DVI' ;;
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)  DEFINE_EXTENSION ;;
+        text/rtf)                           TYPE='RTF' ;;
+        application/vnd.openxmlformats-officedocument.wordprocessingml.document)    TYPE='DOCX' ;;
+        *) REPORT ;;
+    esac
+
+
+    if [ $TYPE = 'TEXT' ]; then
+        if [ ${SUBTYPE:-0} = 'PLAIN' ]; then
+            if [[ $filename =~ $REGEXCODE ]]; then
+                SUBTYPE='CODE'
+            elif [[ $filename =~ \.log$ ]]; then
+                SUBTYPE=LOG
+            elif [[ "$(file --brief $filename)" =~ 'text, with CRLF' ]]; then
+                SUBTYPE='CLRF'
+            elif [[ "$(file --brief $filename)" =~ 'UTF-8 Unicode text' ]];
+            then
+                SUBTYPE='UTF8'
+            fi
+        fi
+#  elif [ $TYPE = 'GZIP' ]; then
+
+    fi
+
+
+    if [ $test ]; then
+        (
+            echo -e "FILE:\t$filename"
+            echo -e "TYPE:\t$TYPE"
+            echo -e "SUBTYPE:\t$SUBTYPE"
+        ) |
+        column -s$'\t' -t
+        exit
+    fi
+
+}
+
+function REPORT {
+    cat <<EOF
+filename = '$filename'
+content_type = '$content_type'
+content_type_name = '$content_type_name'
+content_type_name_clean = '$content_type_name_clean'
+charset = '$charset'
+copiousoutput = '$copiousoutput'
+needsterminal = '$needsterminal'
+test_only = '$test_only'
+file_type = '$file_type'
+magic_mime_type = '$magic_mime_type'
+TYPE = '$TYPE'
+SUBTYPE = '$SUBTYPE'
+EXTENSION = '$EXTENSION'
+EOF
+    exit
+}
+
+function IMAGE {
+    if [ $copiousoutput ]; then
+        identify -verbose $filename
+    elif [ $needsterminal ]; then
+        convert $filename $filename.bmp
+        cacaview $filename.bmp
+        rm $filename.bmp
+    else
+        REPORT
+    fi
+    exit
+}
+
+function IMAGE_GIF {
+    if [ $copiousoutput ]; then
+        IMAGE
+    elif [ $needsterminal ]; then
+        convert $filename jpg:- | convert jpg:- $filename.bmp
+        cacaview $filename.bmp
+    else
+        REPORT
+    fi
+    exit
+}
+
+
+function IMAGE_JPEG {
+    if [ $copiousoutput ]; then
+        IMAGE
+    elif [ $needsterminal ]; then
+        cacaxine "$filename"
+    else
+        REPORT
+    fi
+    exit
+}
+
+
+function MSPOWERPOINT {
+    if [ $copiousoutput ]; then
+        cmd="ppthtml filename | iconv | elinks $ELINKS_DUMP_OPTIONS"
+        eval $cmd
+    elif [ $needsterminal ]; then
+        ppthtml $filename > ${filename}.html
+        elinks -force-html -remote "openURL(${filename}.html, new-tab)"
+        rm ${filename}.html
+    else
+        REPORT
+    fi
+    exit
+}
+
+function MSTNEF {
+    echo $copiousoutput
+    echo $needsterminal
+    cmd="tnef --verbose --debug --file=$filename"
+    if [ $copiousoutput ]; then
+        tnef --verbose --debug --file=$filename
+    elif [ $needsterminal ]; then
+        $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function MSWORD {
+    cmd="antiword -frs -w80 $filename"
+    if [ $copiousoutput ]; then
+        $cmd
+    elif [ $needsterminal ]; then
+        $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_CLRF {
+    cmd="fromdos < $filename | $fmt"
+    if [ $copiousoutput ]; then
+        eval $cmd
+    elif [ $needsterminal ]; then
+        eval $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_CODE {
+    if [ $copiousoutput ]; then
+        cat $filename
+    elif [ $needsterminal ]; then
+        vim -c 'map q <ESC>:qa!<cr>' -RMmn $filename
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_HTML {
+    cmd="elinks ${ELINKS_DUMP_OPTIONS}"
+    if [ $copiousoutput ]; then
+        if [[ $charset =~ ^utf-?8$ ]]; then
+            cmd="uni2ascii -q -y -a Q ${filename} | sed 's/<table/& border=1/ig' | ${cmd}"
+        else
+            cmd="sed 's/<table/& border=1 /ig' ${filename} | ${cmd}"
+        fi
+        eval "${cmd}"
+    elif [ $needsterminal ]; then
+        TEXT_CODE
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_LOG {
+    if [ $copiousoutput ]; then
+        cat $filename
+    elif [ $needsterminal ]; then
+        multitail -c -m 0 -n 999 -i $filename
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_PLAIN {
+    cmd="$fmt < $filename"
+    if [ $copiousoutput ]; then
+        eval $cmd
+    elif [ $needsterminal ]; then
+        eval $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function TEXT_UTF8 {
+    cmd="piconv -f utf8 -t latin1 --perlqq $filename"
+    if [ $copiousoutput ]; then
+        eval $cmd
+    elif [ $needsterminal ]; then
+        eval $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function VCARD {
+    if [ $copiousoutput ]; then
+        mutt.vcard.filter $filename
+    elif [ $needsterminal ]; then
+        less $filename
+    else
+        REPORT
+    fi
+    exit
+}
+
+function VIDEO {
+    if [ $needsterminal ]; then
+        cacaxine $filename
+    else
+        REPORT
+    fi
+    exit
+}
+
+function VIDEO_ASF {
+    VIDEO
+    exit
+}
+
+function VIDEO_WMV {
+    VIDEO
+    exit
+}
+
+function AUDIO_MIDI {
+    if [ $copiousoutput ]; then
+        mediainfo --Full "$filename"
+    elif [ $needsterminal ]; then
+        aplaymidi --port=`aplaymidi --list | awk 'NR==2{print $1}'` "$filename"
+    else
+        REPORT
+    fi
+    exit
+}
+
+function AUDIO_OGG {
+    if [ $copiousoutput ]; then
+        ogginfo "$filename"
+    elif [ $needsterminal ]; then
+        ogg123 "$filename"
+    else
+        REPORT
+    fi
+    exit
+}
+
+function POSTSCRIPT {
+    cmd="ps2ascii $filename"
+    if [ $copiousoutput ]; then
+        $cmd
+    elif [ $nterm ]; then
+        $cmd | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function ZIP {
+    if [ $copiousoutput ]; then
+        unzip -lv $filename
+    elif [ $needsterminal ]; then
+    # while IFS=$'\n' read; do
+    #     [[ "$REPLY" =~ "^.*((cre|infl)ating:) +(.*)[ \t]*$" ]]
+    #     if [ "${BASH_REMATCH[1]}" = 'inflating:' ]; then
+    #         files="$files ${BASH_REMATCH[3]}"
+    #     elif [ "${BASH_REMATCH[1]}" = 'creating:' ]; then
+    #         directories="$directories ${BASH_REMATCH[3]}"
+    #     fi
+    # done < <(unzip -CLL -d /tmp/$filename)
+    # select file in "$files"; do
+    #     [ $REPLY = 'q' ] && break
+    #     mailcap $file 2>&1
+    # done
+    # rm --force --recursive $files $directories
+        expr match "$(unzip -l $filename)" "^.*\([0-9]\+\) files\?$" = 1 &>/dev/null && unzip -c $filename | less
+    else
+        REPORT
+    fi
+    exit
+}
+
+function PDF {
+    cmd="$(cat - <<'EOF'
+(gawk 'BEGIN{NF=79;OFS="=";print $0,"","\nMetadados do PDF:\n",$0,""}';
+ pdfinfo "$filename";
+ printf '%79s\n'|tr ' ' =;
+ pdftotext -eol unix -enc UTF-8 -layout "$filename" - 2>&1 |
+ piconv -f utf8 -t latin1 --perlqq;
+ echo;
+ printf '%79s\n'|tr ' ' =
+)
+EOF
+)"
+
+    if [ $copiousoutput ]; then
+        eval "$cmd"
+    elif [ $needsterminal ]; then
+        (eval "$cmd" | less) 2>/dev/null
+    else
+        REPORT
+    fi
+}
+
+function DVI {
+    cmd='dvipdf "'$filename'" - | pdftotext -eol unix -enc UTF-8 -layout - - 2>&1 | piconv -f utf8 -t latin1 -p';
+    if [ $copiousoutput ]; then
+        eval "$cmd"
+    elif [ $needsterminal ]; then
+        (eval "$cmd" | less) 2>/dev/null
+    else
+        REPORT
+    fi
+}
+
+function SEVENZIP {
+    cmd="7z l $filename"
+    if [ $copiousoutput ]; then
+        $cmd
+    elif [ $needsterminal ]; then
+        $cmd | less -S
+    else
+        REPORT
+    fi
+}
+
+function RAR {
+    cmd="7z l $filename"
+    if [ $copiousoutput ]; then
+        $cmd
+    elif [ $needsterminal ]; then
+        $cmd | less -S
+    else
+        REPORT
+    fi
+}
+
+function MSEXCEL {
+    cmd="$(cat - <<'EOF'
+perl -MData::Table::Excel=xls2tables -wE'($to,$tn)=xls2tables($ARGV[0]);for$t(@$to){print"<h1>",shift@$tn,"</h1><br>";print $t->html =~ s/<table/$& border=1 /igsr;}' "$filename" | piconv -f utf8 -t latin1 -p
+EOF
+)"
+    if [ $needsterminal ]; then
+        eval "$cmd" > $TMPDIR/out.html && browser $TMPDIR/out.html && screen -X select 1
+    elif [ $copiousoutput ]; then
+        cmd="${cmd} | elinks ${ELINKS_DUMP_OPTIONS}"
+        eval "$cmd"
+    else
+        REPORT
+    fi
+}
+
+function ODT {
+    cmd="odt2txt --subst=all --width=-1 $filename"
+    if [ $copiousoutput ]; then
+        $cmd
+    elif [ $needsterminal ]; then
+        $cmd | less -S
+    else
+        REPORT
+    fi
+}
+
+function AUDIO_WAV {
+    if [ $needsterminal ]; then
+        /usr/bin/aplay "$filename"
+    else
+        REPORT
+    fi
+}
+
+function MSEXCEL2007 {
+    cmd="$(cat - <<'EOF'
+perl -MData::Table::Excel=xlsx2tables -wE'($to,$tn)=xlsx2tables($ARGV[0]);for$t(@$to){print"<h1>",shift@$tn,"</h1><br>";print $t->html =~ s/<table/$& border=1 /igsr;}' "$filename" | piconv -f utf8 -t latin1 -p
+EOF
+)"
+    if [ $needsterminal ]; then
+        eval "$cmd" > $TMPDIR/out.html && browser $TMPDIR/out.html && screen -X select 1
+    elif [ $copiousoutput ]; then
+        cmd="${cmd} | elinks ${ELINKS_DUMP_OPTIONS}"
+        eval "$cmd"
+    else
+        REPORT
+    fi
+}
+
+function DOCX {
+   cmd="docx2txt.pl $filename - | piconv -f utf8 -t latin1"
+   if [ $copiousoutput ]; then
+        eval $cmd
+    elif [ $needsterminal ]; then
+       eval $cmd | less -S
+    else
+        REPORT
+   fi
+}
+
+function RTF {
+   cmd="unrtf --nopict --html '$filename' | elinks ${ELINKS_DUMP_OPTIONS}"
+   if [ $copiousoutput ]; then
+        $cmd
+    elif [ $needsterminal ]; then
+       eval $cmd | less -S
+    else
+        REPORT
+   fi
+}
+
+#==============================================================================
+# MAIN
+#==============================================================================
+
+function MAIN_FUNCTION {
+    case $TYPE in
+
+        AUDIO)
+            case $SUBTYPE in
+                MIDI) AUDIO_MIDI ;;
+                MP3)  AUDIO_MP3 ;;
+                OGG)  AUDIO_OGG ;;
+                WAV)  AUDIO_WAV ;;
+            esac
+            ;;
+
+        IMAGE)
+            case $SUBTYPE in
+                JPEG) IMAGE_JPEG ;;
+                PNG)  IMAGE_PNG ;;
+                GIF)  IMAGE_GIF ;;
+                *) REPORT ;;
+            esac
+            ;;
+
+        MSEXCEL) MSEXCEL ;;
+
+        MSPOWERPOINT) MSPOWERPOINT ;;
+
+        MSWORD)       MSWORD ;;
+
+        MSTNEF)       MSTNEF ;;
+
+        TEXT)
+            case $SUBTYPE in
+                UTF8)   TEXT_UTF8 ;;
+                CLRF)   TEXT_CLRF ;;
+                CODE)   TEXT_CODE ;;
+                HTML)   TEXT_HTML ;;
+                LOG)    TEXT_LOG ;;
+                PLAIN)  TEXT_PLAIN ;;
+                *)      REPORT ;;
+            esac
+            ;;
+
+        VIDEO)
+            case $SUBTYPE in
+                ASF)   VIDEO_ASF ;;
+                WMV)   VIDEO_WMV ;;
+                *) REPORT ;;
+            esac
+            ;;
+
+        VCARD) VCARD ;;
+
+        POSTSCRIPT) POSTSCRIPT ;;
+
+        ZIP) ZIP ;;
+
+        PDF) PDF ;;
+
+        7ZIP) SEVENZIP ;;
+
+        RAR) RAR ;;
+
+        ODT) ODT ;;
+
+        MSEXCEL2007+) MSEXCEL2007 ;;
+
+        DOCX) DOCX ;;
+
+        DVI) DVI ;;
+
+    RTF) RTF ;;
+
+        *) REPORT ;;
+
+    esac
+}
+
+DEFINE_TYPE
+
+MAIN_FUNCTION
