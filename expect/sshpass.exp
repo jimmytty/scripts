@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+
+if { [ llength $argv ] < 2 } {
+  send_user "usage: ssh.exp user@host \[options\] password\n"
+  exit
+}
+
+set ssh "/usr/bin/ssh"
+set args [lrange $argv 0 end-1]
+set password [lrange $argv end end]
+
+log_user 0
+eval spawn $ssh $args
+expect " password:"
+send "$password\r"
+expect "~#"
+send "tail -f /var/log/auth.log\r"
+log_user 1
+#expect eof
+interact
