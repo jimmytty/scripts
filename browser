@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# ELinks wrapper
+
+if [ -p /dev/stdin ]; then
+    tmpfile=`mktemp`
+    cat - > $tmpfile
+    /usr/bin/elinks -force-html -remote "openURL($tmpfile, new-tab)"
+elif [ -n "$1" ]; then
+    while [ -n "$1" ]; do
+        /usr/bin/elinks -force-html -remote "openURL(`echo $1`, new-tab)"
+        shift
+    done
+else
+    cat <<'EOF'
+Usage: browser <url>
+       <content> | browser
+EOF
+fi
