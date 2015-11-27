@@ -2,42 +2,39 @@ CREATE OR REPLACE FUNCTION cpf_format(cpf TEXT)
 RETURNS TEXT AS $$
 -- Função para (re)formatar CPFs
 -- Aviso: Esta função não valida CPF.
--- v0.02
+-- v0.03
 -- by Ronaldo Ferreira de Lima aka jimmy <jimmy.tty@gmail.com>
 DECLARE
     cpf_length CONSTANT INTEGER := 11;
-    arr                 TEXT[];
+    arr                 INTEGER[];
+    cpf_num             BIGINT;
     cpf_fmt             TEXT;
-    aleatorio           TEXT;   -- first eigth digits
-    regiao_fiscal       TEXT;   -- ninth digit
-    digito              TEXT;   -- last two digits
 BEGIN
 
     cpf_fmt := TRANSLATE(cpf, TRANSLATE(cpf, '0123456789', ''), '');
+    cpf_num := cpf_fmt::BIGINT;
 
-    IF LENGTH(cpf_fmt) = 0 OR LENGTH(cpf_fmt) > cpf_length THEN
+    IF cpf_num = 0 OR cpf_num > 1e11 THEN
         RETURN NULL;
     END IF;
 
-    cpf_fmt := LPAD(cpf_fmt, cpf_length, '0');
+    arr[1]  := TRUNC( cpf_num / 1e8 ) ;
+    cpf_num := cpf_num - arr[1] * 1e8;
+    arr[2]  := TRUNC(cpf_num / 1e5);
+    cpf_num := cpf_num - arr[2] * 1e5;
+    arr[3]  := TRUNC(cpf_num / 1e2);
+    cpf_num := cpf_num - arr[3] * 1e2;
+    arr[4]  := cpf_num;
 
-    arr:= ARRAY[
-         SUBSTRING(cpf_fmt, 1, 8)
-        ,SUBSTRING(cpf_fmt, 9, 1)
-        ,SUBSTRING(cpf_fmt, 10, 2)
-    ];
-
-    aleatorio := CONCAT(
-         SUBSTRING(arr[1], 1,3)
+    cpf_fmt := CONCAT(
+         LPAD(arr[1]::TEXT, 3, '0')
         ,'.'
-        ,SUBSTRING(arr[1], 4,7)
+        ,LPAD(arr[2]::TEXT, 3, '0')
         ,'.'
-        ,SUBSTRING(arr[1], 8)
+        ,LPAD(arr[3]::TEXT, 3, '0')
+        ,'-'
+        ,LPAD(arr[4]::TEXT, 2, '0')
     );
-    regiao_fiscal := arr[2];
-    digito        := arr[3];
-
-    cpf_fmt := FORMAT('%s%s-%s', aleatorio, regiao_fiscal, digito);
 
     RETURN cpf_fmt;
 
