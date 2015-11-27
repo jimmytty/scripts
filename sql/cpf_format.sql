@@ -2,7 +2,7 @@ CREATE OR REPLACE FUNCTION cpf_format(cpf TEXT)
 RETURNS TEXT AS $$
 -- Função para (re)formatar CPFs
 -- Aviso: Esta função não valida CPF.
--- v0.01
+-- v0.02
 -- by Ronaldo Ferreira de Lima aka jimmy <jimmy.tty@gmail.com>
 DECLARE
     cpf_length CONSTANT INTEGER := 11;
@@ -21,15 +21,21 @@ BEGIN
 
     cpf_fmt := LPAD(cpf_fmt, cpf_length, '0');
 
-    arr := REGEXP_MATCHES(cpf_fmt, '^(\d{8})(\d)(\d{2})$');
+    arr:= ARRAY[
+         SUBSTRING(cpf_fmt, 1, 8)
+        ,SUBSTRING(cpf_fmt, 9, 1)
+        ,SUBSTRING(cpf_fmt, 10, 2)
+    ];
 
-    aleatorio :=
-        ARRAY_TO_STRING(
-            REGEXP_MATCHES(arr[1], '^(\d{3})(\d{3})(\d{2})$'),
-            '.'
-        );
+    aleatorio := CONCAT(
+         SUBSTRING(arr[1], 1,3)
+        ,'.'
+        ,SUBSTRING(arr[1], 4,7)
+        ,'.'
+        ,SUBSTRING(arr[1], 8)
+    );
     regiao_fiscal := arr[2];
-    digito := arr[3];
+    digito        := arr[3];
 
     cpf_fmt := FORMAT('%s%s-%s', aleatorio, regiao_fiscal, digito);
 
