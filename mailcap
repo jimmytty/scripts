@@ -278,11 +278,13 @@ EOF
 
 function IMAGE {
     if [ $copiousoutput ]; then
-        identify -verbose $filename
+        identify -verbose "$filename"
     elif [ $needsterminal ]; then
-        convert $filename $filename.bmp
-        cacaview $filename.bmp
-        rm $filename.bmp
+        #convert $filename $filename.bmp
+        #cacaview $filename.bmp
+        convert "$filename" "$filename.pdf"
+        /usr/bin/fbpdf2 "$filename.pdf"
+        rm "$filename.pdf"
     else
         REPORT
     fi
@@ -306,13 +308,24 @@ function IMAGE_JPEG {
     if [ $copiousoutput ]; then
         IMAGE
     elif [ $needsterminal ]; then
-        cacaxine "$filename"
+        #cacaxine "$filename"
+        IMAGE
     else
         REPORT
     fi
     exit
 }
 
+function IMAGE_PNG {
+    if [ $copiousoutput ]; then
+        IMAGE
+    elif [ $needsterminal ]; then
+        IMAGE
+    else
+        REPORT
+    fi
+    exit
+}
 
 function MSPOWERPOINT {
     if [ $copiousoutput ]; then
@@ -381,9 +394,11 @@ function TEXT_HTML {
     cmd="elinks ${ELINKS_DUMP_OPTIONS}"
     if [ $copiousoutput ]; then
         if [[ $charset =~ ^utf-?8$ ]]; then
-            cmd="uni2ascii -q -y -a Q ${filename} | sed 's/<table/& border=1/ig' | ${cmd}"
+            #cmd="uni2ascii -q -y -a Q ${filename} | sed 's/<table/& border=1/ig' | ${cmd}"
+            cmd="uni2ascii -q -y -a Q ${filename} | ${cmd}"
         else
-            cmd="sed 's/<table/& border=1 /ig' ${filename} | ${cmd}"
+            #cmd="sed 's/<table/& border=1 /ig' ${filename} | ${cmd}"
+            cmd="${cmd} ${filename}"
         fi
         eval "${cmd}"
     elif [ $needsterminal ]; then
@@ -533,7 +548,8 @@ EOF
     if [ $copiousoutput ]; then
         eval "$cmd"
     elif [ $needsterminal ]; then
-        (eval "$cmd" | less) 2>/dev/null
+        #(eval "$cmd" | less) 2>/dev/null
+        /usr/bin/fbpdf2 "$filename"
     else
         REPORT
     fi
@@ -588,11 +604,11 @@ EOF
 }
 
 function ODT {
-    cmd="odt2txt --subst=all --width=-1 $filename"
+    cmd="odt2txt --subst=all --width=-1 \"$filename\""
     if [ $copiousoutput ]; then
-        $cmd
+        eval $cmd
     elif [ $needsterminal ]; then
-        $cmd | less -S
+        eval $cmd | less -S
     else
         REPORT
     fi
@@ -643,13 +659,22 @@ function RTF {
    fi
 }
 
+function AUDIO_MP3 {
+   if [ $copiousoutput ]; then
+       exiftool "$filename"
+   elif [ $needsterminal ]; then
+       /usr/bin/mplayer -vo null "$filename"
+    else
+        REPORT
+   fi
+}
+
 #==============================================================================
 # MAIN
 #==============================================================================
 
 function MAIN_FUNCTION {
     case $TYPE in
-
         AUDIO)
             case $SUBTYPE in
                 MIDI) AUDIO_MIDI ;;
@@ -658,7 +683,6 @@ function MAIN_FUNCTION {
                 WAV)  AUDIO_WAV ;;
             esac
             ;;
-
         IMAGE)
             case $SUBTYPE in
                 JPEG) IMAGE_JPEG ;;
@@ -667,15 +691,10 @@ function MAIN_FUNCTION {
                 *) REPORT ;;
             esac
             ;;
-
         MSEXCEL) MSEXCEL ;;
-
         MSPOWERPOINT) MSPOWERPOINT ;;
-
         MSWORD)       MSWORD ;;
-
         MSTNEF)       MSTNEF ;;
-
         TEXT)
             case $SUBTYPE in
                 UTF8)   TEXT_UTF8 ;;
@@ -687,7 +706,6 @@ function MAIN_FUNCTION {
                 *)      REPORT ;;
             esac
             ;;
-
         VIDEO)
             case $SUBTYPE in
                 ASF)   VIDEO_ASF ;;
@@ -695,31 +713,18 @@ function MAIN_FUNCTION {
                 *) REPORT ;;
             esac
             ;;
-
         VCARD) VCARD ;;
-
         POSTSCRIPT) POSTSCRIPT ;;
-
         ZIP) ZIP ;;
-
         PDF) PDF ;;
-
         7ZIP) SEVENZIP ;;
-
         RAR) RAR ;;
-
         ODT) ODT ;;
-
         MSEXCEL2007+) MSEXCEL2007 ;;
-
         DOCX) DOCX ;;
-
         DVI) DVI ;;
-
     RTF) RTF ;;
-
         *) REPORT ;;
-
     esac
 }
 
