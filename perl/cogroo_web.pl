@@ -74,8 +74,7 @@ my $mech = WWW::Mechanize->new(
 $mech->timeout(30);
 
 $mech->agent_alias(q(Linux Mozilla));
-my @sentence = grep { $_ ne q() }
-    split /(?<=[^[:blank:][:punct:][:cntrl:]]\.)\s+(?=\p{Lu})|\n/, <>;
+my @sentence = grep { $_ ne q() } split /(?<=[.!?])\s+(?=\p{Lu})|\n/, <>;
 
 foreach my $sentence (@sentence) {
     if ( length $sentence > 255 ) {
