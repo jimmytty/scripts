@@ -104,8 +104,6 @@ while ( my $sentence = shift @sentence ) {
     }
     $mech->submit();
 
-    $mech->save_content('html.html');
-
     my %parse = parse( $mech->content() );
     unless (%parse) {
         say q([ERROR] NAO CONSEGUI RESPOSTA.);
