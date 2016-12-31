@@ -13,10 +13,10 @@ echo '# [EXPENSES]'
 ledger \
     register '^expenses' \
     --flat \
-    --period=$(date +%Y-%m) \
-    --subtotal \
     --monthly \
-    --period-sort='(amount)'
+    --period-sort='(amount)' \
+    --period=$(date +%Y-%m) \
+    --subtotal
 
 echo '----------'
 formats=(
@@ -38,7 +38,7 @@ ledger \
     --flat \
     --monthly \
     --period-sort='(amount)' \
-    --period=$(date +%Y-%m) \
+    --period='this year' \
     --subtotal
 
 echo '----------'
@@ -56,6 +56,14 @@ ledger \
     --balance-format="$format"
 
 echo $hr
+
+echo '# [INCOME x EXPENSES]'
+ledger \
+    balance '^expenses|income' \
+    --empty \
+    --flat \
+    --period='this year' \
+    --balance-format '%/%T%20P(*positive means deficit)\n'
 # echo '# [BUDGET]'
 # ledger \
 #     balance '^expenses' \
@@ -64,3 +72,4 @@ echo $hr
 #     --flat \
 #     --period="$(date +%Y-%m)" \
 #     --prepend-format="[$(date +%Y-%m)]"
+
