@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION cpf_check(cpf_str TEXT)
 RETURNS BOOLEAN AS $$
 -- Função para validação numérica de CPF
--- v0.01
+-- v0.01.01
 -- by Ronaldo Ferreira de Lima aka jimmy <jimmy.tty@gmail.com>
 DECLARE
     peso1 CONSTANT INTEGER[] := ARRAY[10,  9, 8, 7, 6, 5, 4, 3, 2];
@@ -21,8 +21,11 @@ BEGIN
 
     cpf_unfmt := TRANSLATE(cpf_str, TRANSLATE(cpf_str, '0123456789', ''), '');
 
-    IF LENGTH(cpf_unfmt) = 0 OR LENGTH(cpf_unfmt) > 11 THEN
-        RAISE 'length';
+    IF LENGTH(cpf_unfmt) = 0 OR LENGTH(cpf_unfmt) > cpf_length THEN
+        RETURN FALSE;
+    END IF;
+
+    IF cpf_unfmt::BIGINT = 0 THEN
         RETURN FALSE;
     END IF;
 

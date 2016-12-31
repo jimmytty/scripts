@@ -1,4 +1,4 @@
-#!/usr/bin/expect -f
+#!/usr/bin/expect -f 
 
 if { [ llength $argv ] < 2 } {
   send_user "usage: ssh.exp user@host \[options\] password\n"
@@ -18,3 +18,4 @@ send "tail -f /var/log/auth.log\r"
 log_user 1
 #expect eof
 interact
+

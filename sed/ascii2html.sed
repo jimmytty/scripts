@@ -1,12 +1,12 @@
 #!/usr/bin/sed -f
 
-### TODO: inserir referências e testar
+### inserir referências e testar
 
 s/^/\n/;
 
 :main
 ### ASCII Printable Characters
-s/\n /\&#32;\n/;	# space
+s/\n /\&#32;\n/;	# space 
 s/\n!/\&#33;\n/;	# exclamation mark
 s/\n"/\&#34;\n/;	# quotation mark
 s/\n#/\&#35;\n/;	# number sign

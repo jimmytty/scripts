@@ -3,7 +3,6 @@
 use strict;
 use warnings q(all);
 
-binmode STDOUT, q(:utf8);
 local $/ = undef();
 my $html_code = <>;
 

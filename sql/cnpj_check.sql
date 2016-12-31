@@ -13,7 +13,7 @@ DECLARE
     dv1                  INTEGER;
     dv2                  INTEGER;
     subscript            INTEGER;
-    digito                INTEGER;
+    digito               INTEGER;
     peso                 INTEGER;
     produto              INTEGER;
 
@@ -22,7 +22,6 @@ BEGIN
     cnpj_unfmt := TRANSLATE(cnpj_str, TRANSLATE(cnpj_str, '0123456789', ''), '');
 
     IF LENGTH(cnpj_unfmt) = 0 OR LENGTH(cnpj_unfmt) > cnpj_length THEN
-        RAISE 'length';
         RETURN FALSE;
     END IF;
 

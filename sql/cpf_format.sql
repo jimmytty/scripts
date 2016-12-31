@@ -18,7 +18,7 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    arr[1]  := TRUNC( cpf_num / 1e8 ) ;
+    arr[1]  := TRUNC( cpf_num / 1e8 );
     cpf_num := cpf_num - arr[1] * 1e8;
     arr[2]  := TRUNC(cpf_num / 1e5);
     cpf_num := cpf_num - arr[2] * 1e5;

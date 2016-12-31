@@ -73,7 +73,7 @@ ELINKS_DUMP_OPTIONS=$(cat <<EOF
 -no-numbering
 EOF
 )
-ELINKS_DUMP_OPTIONS=${ELINKS_DUMP_OPTIONS[@]}
+ELINKS_DUMP_OPTIONS=$(printf ' %s' ${ELINKS_DUMP_OPTIONS[*]})
 elinks="$(which elinks 2>&1)"
 
 fmt='fmt --prefix="" --split-only --uniform-spacing --width=80'
