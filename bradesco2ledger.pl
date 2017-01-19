@@ -19,8 +19,9 @@ my @header = (
 );
 
 my %extrato;
-open my $fh, q(<), shift @ARGV;
-while ( my $line = <$fh> ) {
+open my $ofh, q(>), q(bradesco.dat);
+open my $ifh, q(<), shift @ARGV;
+while ( my $line = <$ifh> ) {
     chomp $line;
     my @row = split /;/, $line;
 
@@ -81,7 +82,6 @@ while ( my $line = <$fh> ) {
         $#row = $#header;
         @row{ map { $_->[1] } @header } = map { $_ // q() } @row;
         foreach (qw[credito debito saldo]) {
-            next;
             next if $row{$_} eq q();
             my $value = $row{$_};
             $value = abs $value;
@@ -94,10 +94,11 @@ while ( my $line = <$fh> ) {
 
         %{ $extrato{$INPUT_LINE_NUMBER} } = %row;
     } ## end else [ if ( @row == 2 && $row...)]
-} ## end while ( my $line = <$fh> )
+} ## end while ( my $line = <$ifh>)
 
 my %ledger;
 my @number = sort { $a <=> $b } keys %extrato;
+select $ofh;
 for ( my $i = 0; $i <= $#number; $i++ ) {
     my %row = %{ $extrato{ $number[$i] } };
 
