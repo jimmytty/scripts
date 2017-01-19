@@ -57,13 +57,20 @@ ledger \
 
 echo $hr
 
-echo '# [INCOME x EXPENSES]'
+echo '# [INCOME - EXPENSES] (Yearly)'
 ledger \
-    balance '^expenses|income' \
-    --empty \
-    --flat \
-    --period='this year' \
-    --balance-format '%/%T%20P(*positive means deficit)\n'
+    --total-data \
+    balance '^income' '^expenses' \
+    --no-total |
+    awk '
+    BEGIN { RS = "\r" } {
+        c = $4 - $2;
+        s = c < 0 ? "-" : "+";
+        printf "R$%.2f - R$%.2f = ", $4, $2;
+        printf "R$%c%.2f\n", s, c;
+    }
+    '
+
 # echo '# [BUDGET]'
 # ledger \
 #     balance '^expenses' \
