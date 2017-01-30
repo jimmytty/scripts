@@ -65,9 +65,9 @@ ledger \
     awk '
     BEGIN { RS = "\r" } {
         c = $4 - $2;
-        s = c < 0 ? "-" : "+";
         printf "R$%.2f - R$%.2f = ", $4, $2;
-        printf "R$%c%.2f\n", s, c;
+        if ( c > 0 ) { printf "R$+%.2f\n", c; }
+        else         { printf "R$%.2f\n", c;  }
     }
     '
 
